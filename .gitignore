@@ -1,0 +1,14 @@
+target/
+**/target/
+__pycache__/
+*.pyc
+*.log
+exec_strace.txt
+dbg.txt
+out.txt
+p1.txt
+p2.txt
+p3.txt
+run.txt
+debug_expected.txt
+stages.json

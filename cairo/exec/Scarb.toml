@@ -1,0 +1,15 @@
+[package]
+name = "vdf_exec"
+version = "0.1.0"
+edition = "2024_07"
+license = "Apache-2.0"
+
+[dependencies]
+starknet = "2.13.1"
+cairo_execute = ">=2.20.0"
+vdf = { path = "../lib" }
+
+[[target.executable]]
+
+[cairo]
+enable-gas = false
