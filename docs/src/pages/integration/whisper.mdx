@@ -1,0 +1,64 @@
+---
+title: Whisper sealed-bid auctions
+description: How this VDF integrates with Whisper's private Vickrey auctions as the deadline-decryption mechanism.
+---
+
+# Whisper integration
+
+Whisper ([broody/whisper](https://github.com/broody/whisper)) is a private
+sealed-bid auction protocol on Starknet. Its current 1-of-1 operator holds the
+reveal key and can decrypt bids early — this VDF replaces that with **deadline
+decryption**: the decryption capability materializes at the deadline, no
+standing decryptor.
+
+## The two trust axes
+
+| Axis | Question | Mechanism |
+|---|---|---|
+| **Custody** | Who can move funds? | Shadow accounts / contract-gated escrow (STRK20) |
+| **Reveal timing** | When do amounts become readable? | **This repo: RSW timelock + Wesolowski VDF** |
+
+## Integration split
+
+```mermaid
+flowchart LR
+  sdk["whisper sdk/ — RSW encrypt<br/>(part of the bid flow)"]
+  contracts["whisper contracts/ — reveal_bid<br/>(additive entrypoint)"]
+  operator["whisper operator/ — VDF eval + relay<br/>(becomes relayer, not decryptor)"]
+  vdf["this repo — Cairo verifier program<br/>+ proving pipeline"]
+
+  sdk --> contracts
+  operator --> vdf
+  vdf --> contracts
+```
+
+- **RSW encryption → whisper `sdk/`**: bidders generate the RSA modulus and
+  timelock-encrypt their opening at bid time. It lives in the bid flow, not in
+  a second package.
+- **`reveal_bid` → whisper `contracts/`**: additive permissionless entrypoint,
+  gated on `now >= force_reveal_after`, reusing the existing commitment check.
+  No STRK20 pool-callback breakage.
+- **Post-deadline VDF evaluation + relay → whisper `operator/`**: the operator
+  becomes a relayer — anyone can compute the VDF and reveal.
+- **Cairo verifier program + proving pipeline → this repo** (standalone).
+
+## Why standalone
+
+1. **Toolchain separation**: this repo needs Rust (Stwo prover, nightly) +
+   scarb 2.20; whisper is Cairo + TS + pnpm.
+2. **Not auction-specific**: the RFP names the whole sealed-bid class — DAO
+   grants, OTC, parameter auctions. Upstreamable to
+   `starkware-libs/proving`.
+3. **Whisper stays product-shaped** (contracts/sdk/operator/docs).
+
+## Production notes
+
+- **Bind L onchain**: production must derive the Wesolowski challenge
+  `L = H(x, y, T)` in the contract (Poseidon), not accept it as input.
+- **T calibration**: choose T so the deadline lands after
+  `force_reveal_after` with margin; fast machines solve faster.
+- **Modulus size**: 2048-bit for production (`N_LIMBS = 32`), which needs a
+  serious proving machine.
+
+Full details: `skill/references/whisper-integration-design.md` in this repo, or
+`VDF_INTEGRATION_PLAN.md` in the whisper repo.

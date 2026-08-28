@@ -12,3 +12,5 @@ p3.txt
 run.txt
 debug_expected.txt
 stages.json
+docs/node_modules/
+docs/dist/

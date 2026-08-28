@@ -1,0 +1,51 @@
+---
+title: Proving pipeline
+description: From Cairo execution to a Stwo proof and onchain verification.
+---
+
+# Proving pipeline
+
+The whole point of an `#[executable]` (vs a contract) is that the heavy
+computation runs **offchain**, gets **proven** with Stwo, and the proof is
+**verified onchain** cheaply.
+
+## The pipeline
+
+```text
+cairo/exec  →  scarb execute --output=standard
+            →  target/execute/<pkg>/executionN/prover_input.json
+            →  scarb prove --execution-id N
+            →  target/execute/<pkg>/executionN/proof/proof.json
+            →  scarb verify <proof.json>
+```
+
+## Onchain verification (the end state)
+
+stwo-cairo ships a **Cairo verifier** — the same verification logic written in
+Cairo, runnable inside the Cairo VM. This enables:
+
+- **Recursive proving**: a Cairo program that verifies a Stwo Cairo proof can
+  itself be proven, yielding a proof tree.
+- **Onchain settlement**: a Starknet tx verifies the small proof instead of
+  executing the ~billion-step computation.
+
+## Gotchas learned the hard way
+
+1. **`--output=standard` is required** to emit `prover_input.json`. The default
+   output is `None` — you get an empty execution dir and no error.
+2. **Arguments file format**: JSON array of **hex strings** (`0x...`), with a
+   leading length felt for `Span<felt252>` params (serde reads length first).
+3. **OOM is real**: the prover input for 1024-bit is ~139MB; Stwo needs
+   10-17GB to prove. Use the 512-bit default for CI; prove big sizes on a big
+   machine.
+4. **`scarb prove` invokes the prover with high memory** — on a constrained box
+   it dies silently (OOM-kill, exit 137 or empty proof dir). Check `dmesg`.
+5. **Direct binary invocation** of `scarb-execute`/`scarb-prove` needs
+   `SCARB_TARGET_DIR` and `SCARB_PROFILE=dev` exported; the `scarb` shell sets
+   them automatically.
+
+## Performance
+
+- The 512-bit full verification runs as an executable in well under a minute.
+- Proving time depends on machine; the Stwo prover is the current bottleneck
+  (memory, not time, on small boxes).

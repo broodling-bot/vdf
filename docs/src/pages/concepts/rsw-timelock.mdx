@@ -1,0 +1,54 @@
+---
+title: RSW timelock
+description: Rivest–Shamir–Wagner timelock encryption — encrypt fast, decrypt only after T sequential squarings.
+---
+
+# RSW timelock
+
+The classic construction (Rivest, Shamir, Wagner 1996): encrypt a message so
+that decryption provably requires T sequential modular squarings.
+
+## Setup
+
+1. Generate an RSA modulus `N = p·q` (factors known only to the encryptor).
+2. Pick a base `x ∈ ℤ_N*` and a delay parameter `T` (chosen so T squarings take
+   roughly the desired deadline).
+
+## Encryption (instant — encryptor's shortcut)
+
+```text
+y = x^(2^T mod φ(N)) mod N
+key = KDF(y)
+ciphertext = AEAD_encrypt(key, message)
+```
+
+Because the encryptor knows φ(N), they can reduce the exponent `2^T mod φ(N)`
+and compute y in O(log T) multiplications. The factors can then be **discarded**.
+
+## Decryption (the delay — everyone else)
+
+```text
+y = x^(2^T) mod N        — T sequential squarings
+key = KDF(y)
+message = AEAD_decrypt(key, ciphertext)
+```
+
+Each squaring depends on the previous one, so the work is inherently
+sequential — this is the "time lock". The key exists only after ~T squarings.
+
+## Properties
+
+- **No trusted setup per message**: the encryptor is the only holder of the
+  factors, and discards them.
+- **Symmetric delay**: solving is sequential; there is no shortcut without the
+  factors (factoring N is assumed hard).
+- **Calibration is approximate**: a fast machine solves T squarings faster than
+  a slow one. Choose T conservatively and treat the deadline as "reveal becomes
+  possible around T", with a hard onchain gate (`force_reveal_after`) enforcing
+  the actual reveal time.
+
+## In this repo
+
+`ref/vdf_reference.py` implements RSW with a safe-prime check that the φ(N)
+shortcut equals sequential squaring, and generates the test vectors in
+`vectors/`.

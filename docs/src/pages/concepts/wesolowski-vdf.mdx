@@ -1,0 +1,54 @@
+---
+title: Wesolowski VDF
+description: A short proof that T sequential squarings were performed, verifiable in O(log T) group operations.
+---
+
+# Wesolowski VDF
+
+A Verifiable Delay Function produces an output that is (a) expensive to compute
+(T sequential squarings) and (b) cheap to **verify** — in this case, one
+equation check.
+
+## The proof
+
+After computing `y = x^(2^T) mod N`, the prover additionally computes:
+
+```text
+L = H(x, y, T)             hash-derived challenge (256-bit)
+q = floor(2^T / L)         quotient
+r = 2^T mod L              remainder
+π = x^q mod N              the proof
+```
+
+Note `q` and `r` satisfy `2^T = q·L + r`, so:
+
+```text
+x^(2^T) = x^(q·L + r) = (x^q)^L · x^r = π^L · x^r   (mod N)
+```
+
+## The verification
+
+```text
+L = H(x, y, T)
+r = 2^T mod L                     ← cheap: pow(2, T, L)
+check  π^L · x^r == y  (mod N)    ← two modpows, 256-bit exponents
+```
+
+The verifier never performs the T squarings. It checks a statement about them
+in O(log T) group operations.
+
+## Why the challenge L matters
+
+L must be derived from the transcript `(x, y, T)` — never chosen by the prover.
+If the prover could pick L, they could fake the proof. In the current repo, L
+is computed offchain and passed into the Cairo verifier; **production must
+derive L onchain** (Poseidon is cheap in Cairo) so the prover cannot choose a
+favorable challenge.
+
+## In this repo
+
+- `ref/cairo_model_v2.py` — exact Python mirror of the Cairo verification
+  algorithm (validates any change before porting).
+- `cairo/lib/src/lib.cairo` — `verify_vdf`: recompute `r = 2^T mod L`, then
+  check `pi^L · x^r == y mod N`.
+- `cairo/exec` — `#[executable] vdf_verify` entrypoint for the proving pipeline.

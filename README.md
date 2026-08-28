@@ -43,6 +43,18 @@ The Cairo `lib` and `exec` are **two standalone packages** (a scarb workspace
 forces `[cairo]` settings at the workspace level, which conflicts with the
 executable target's `enable-gas = false`).
 
+## Documentation
+
+The `docs/` directory is a [Vocs](https://vocs.dev) site (same stack as
+Whisper's docs). Run it locally:
+
+```sh
+cd docs
+pnpm install
+pnpm dev          # local dev server
+pnpm build        # static site output in docs/dist/
+```
+
 ## Quick start
 
 Requires scarb ≥ 2.20 (ships `scarb execute` / `scarb prove` / `scarb verify`).

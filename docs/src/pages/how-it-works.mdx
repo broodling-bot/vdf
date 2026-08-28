@@ -1,0 +1,64 @@
+---
+title: How it works
+description: The RSW timelock + Wesolowski proof flow, end to end.
+---
+
+# How it works
+
+## The flow
+
+1. **Encrypt (instant).** The encryptor generates an RSA modulus N = p·q and
+   derives the timelock key instantly:
+
+   ```text
+   y = x^(2^T mod φ(N)) mod N
+   ```
+
+   Because they know φ(N), the exponent `2^T mod φ(N)` is cheap. The message
+   (e.g. a bid opening `(amount, salt)`) is AEAD-encrypted under a key derived
+   from y. The factors p, q can then be **discarded** — nobody else ever needs
+   them.
+
+2. **Delay (sequential).** To decrypt, anyone must compute:
+
+   ```text
+   y = x^(2^T) mod N   — by T sequential squarings
+   ```
+
+   This is the "delay" of the VDF. It cannot be parallelized: each squaring
+   depends on the previous one. The key materializes only at ~time T.
+
+3. **Prove (short).** Once the squarings are done, the prover publishes a
+   Wesolowski proof:
+
+   ```text
+   L = H(x, y, T)              challenge from the transcript
+   q = floor(2^T / L),  r = 2^T mod L
+   π = x^q mod N               the proof
+   ```
+
+4. **Verify (O(log T)).** A verifier checks one equation:
+
+   ```text
+   y == π^L · x^r  (mod N)
+   ```
+
+   Only two modular exponentiations with 256-bit exponents are needed —
+   milliseconds, not T squarings.
+
+## Why the encryptor isn't a trusted party
+
+The RSW construction has **no trusted setup per message**: the encryptor is the
+only party that ever knows the factors, and they can discard them immediately
+after encryption. For sealed bids this is exactly right — the bidder keeps their
+own bid secret from everyone, including the auctioneer, without any committee
+or hardware trust.
+
+## Why this beats the alternatives for reveal timing
+
+| Mechanism | Standing decryptor? | Trust assumption |
+|---|---|---|
+| Operator reveal key (today) | Yes — operator decrypts anytime | Operator honesty |
+| Threshold committee | No single member | M-of-N collusion + MPC over viewing key (unsolved) |
+| TEE | No | Hardware + attestation |
+| **RSW + Wesolowski VDF** | **No** | **Time itself (sequential work)** |

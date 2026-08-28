@@ -1,0 +1,52 @@
+---
+title: Cairo bigint
+description: Why Cairo needs u64/u256 limbs instead of felt252, and the Barrett reduction pattern used here.
+---
+
+# Cairo bigint
+
+Cairo's native `felt252` is a field element — it has **no `PartialOrd`, no
+`Rem`, no bit shifts, and `/` is field division**. You cannot do normal bigint
+arithmetic on it directly. This repo uses a validated pattern:
+
+## Representation
+
+- **Limbs**: `u64`, little-endian.
+- **Multiplication**: accumulate in `u256` (products of two u64 fit; sums of
+  ≤17 products stay well under 2^256).
+- **Carry**: `acc & 0xffffffffffffffff_u256` → limb, `acc / 2^64` → carry
+  (constant-divisor division on u256 is integer division).
+- **Subtraction with borrow**: compute in `u128`; the borrow applies to the
+  **subtrahend**, not the minuend (a real bug caught by the Python model).
+- **Bit scan in modpow**: `e % 2` / `e / 2` loop on u64 (not shifts).
+
+## Barrett reduction
+
+To reduce a 2k-limb product modulo a k-limb modulus N:
+
+```text
+mu = floor(b^(2k) / N)   computed offchain, k+1 limbs
+q1 = p >> (k-1)
+q2 = q1 * mu
+q3 = q2 >> (k+1)
+r  = p - q3*N   mod b^k
+while r >= N: r -= N     (at most 2 iterations)
+```
+
+## Per-modulus limb domains
+
+Each modulus gets its own limb count and Barrett constant:
+
+| Modulus | Size | Limbs |
+|---|---|---|
+| N (RSA modulus) | 512-bit demo / 1024-bit production | 8 / 16 |
+| L (Wesolowski challenge) | 256-bit | 4 |
+
+Mixing domains breaks the reduction (an infinite normalize loop — the other
+real bug the Python model caught).
+
+## Validate before you port
+
+`ref/cairo_model_v2.py` is the **exact Python mirror** of the Cairo algorithm.
+Change it first, validate against the vectors, then port limb-for-limb. Never
+port bigint changes blind.
