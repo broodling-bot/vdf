@@ -30,7 +30,14 @@ cairo/
 ref/     # Python reference implementation + exact Cairo-algorithm model
 vectors/ # test vectors (RSW keys + Wesolowski proofs)
 scripts/ # generators: vectors, Cairo tests, executable args
+skill/   # the Hermes skill for this work (SKILL.md + references + scripts)
 ```
+
+`skill/` is the Hermes Agent skill `vdf-timelock-cairo` — the operational playbook
+for this exact pipeline (scheme, Cairo bigint pattern, scarb 2.20 executable
+setup, proving gotchas), plus `references/whisper-integration-design.md`
+capturing the sealed-bid auction design reasoning. Install it with
+`hermes skills install` or copy `skill/SKILL.md` to your skills directory.
 
 The Cairo `lib` and `exec` are **two standalone packages** (a scarb workspace
 forces `[cairo]` settings at the workspace level, which conflicts with the
